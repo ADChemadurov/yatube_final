@@ -19,8 +19,8 @@
                             <ul class="list-group list-group-flush">
                                     <li class="list-group-item">
                                             <div class="h6 text-muted">
-                                            Подписчиков: XXX <br />
-                                            Подписан: XXX
+                                            Подписчиков: {{ followers_qty }} <br />
+                                            Подписан: {{ followed_qty }}
                                             </div>
                                     </li>
                                     <li class="list-group-item">
@@ -37,19 +37,7 @@
                 <!-- Отображение поста. -->
                 {% include "post_item.html" with post=post %}
                 <!-- Отображение комментариев. -->
-                {% for item in comments %}
-                <div class="media card mb-4">
-                        <div class="media-body card-body">
-                                <h5 class="mt-0">
-                                        <a href="{% url 'profile' item.author.username %}"
-                                        name="comment_{{ item.id }}">
-                                                {{ item.author.username }}
-                                        </a>
-                                </h5>
-                                <p>{{ item.text | linebreaksbr }}</p>
-                        </div>
-                </div>
-                {% endfor %}
+                {% include "posts/comments.html" %}
      </div>
     </div>
 </main>

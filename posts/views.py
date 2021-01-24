@@ -141,13 +141,27 @@ def post_view(request, username, post_id):
     """
     author = get_object_or_404(User, username=username)
     post = get_object_or_404(Post, id=post_id)
+    followers_qty = author.following.count()
+    followed_qty = author.follower.count()
     posts_number = Post.objects.filter(author=author).count()
     comments = post.comments.all()
+    form = CommentForm(request.POST or None)
+    if form.is_valid():
+        comment = form.save(commit=False)
+        comment.post = Post.objects.get(id=post_id)
+        comment.author = request.user
+        form.save()
+        return redirect(
+            reverse("post", kwargs={"username": username, "post_id": post_id})
+        )
     context = {
+        "form": form,
         "posts_number": posts_number,
         "author": author,
         "post": post,
         "comments": comments,
+        "followers_qty": followers_qty,
+        "followed_qty": followed_qty,
     }
     return render(request, "posts/post.html", context)
 
@@ -181,7 +195,11 @@ def post_edit(request, username, post_id):
 @login_required
 def add_comment(request, username, post_id):
     """ Отображение страницы страницы создания комментария к посту. """
+    author = get_object_or_404(User, username=username)
     post = get_object_or_404(Post, id=post_id)
+    followers_qty = author.following.count()
+    followed_qty = author.follower.count()
+    posts_number = Post.objects.filter(author=author).count()
     comments = post.comments.all()
     form = CommentForm(request.POST or None)
     if form.is_valid():
@@ -189,12 +207,19 @@ def add_comment(request, username, post_id):
         comment.post = Post.objects.get(id=post_id)
         comment.author = request.user
         form.save()
-        return redirect(reverse(
-            "post",
-            kwargs={"username": username, "post_id": post_id}
-        ))
-    context = {"form": form, "comments": comments}
-    return render(request, "posts/comments.html", context)
+        return redirect(
+            reverse("post", kwargs={"username": username, "post_id": post_id})
+        )
+    context = {
+        "form": form,
+        "posts_number": posts_number,
+        "author": author,
+        "post": post,
+        "comments": comments,
+        "followers_qty": followers_qty,
+        "followed_qty": followed_qty,
+    }
+    return render(request, "posts/post.html", context)
 
 
 def page_not_found(request, exception):
