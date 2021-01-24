@@ -13,7 +13,7 @@ from .forms import PostForm, CommentForm
 @login_required
 def follow_index(request):
     """ Отображение всех постов авторов на которых подписан пользователь. """
-    posts = get_list_or_404(Post, author__following__user=request.user)
+    posts = Post.objects.filter(author__following__user=request.user)
     paginator = Paginator(posts, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
