@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Посты автора {{ author_name }}{% endblock %}
+{% block content %}
+
+<main role="main" class="container">
+    <div class="row">
+            <div class="col-md-3 mb-3 mt-1">
+                    <div class="card">
+                            <div class="card-body">
+                                    <div class="h2">
+                                        <!-- Имя автора -->
+                                        {{ author.get_full_name }}
+                                    </div>
+                                    <div class="h3 text-muted">
+                                         <!-- username автора -->
+                                         {{ author.username }}
+                                    </div>
+                            </div>
+                            <ul class="list-group list-group-flush">
+                                    <li class="list-group-item">
+                                            <div class="h6 text-muted">
+                                            Подписчиков: XXX <br />
+                                            Подписан: XXX
+                                            </div>
+                                    </li>
+                                    <li class="list-group-item">
+                                            <div class="h6 text-muted">
+                                                <!-- Количество записей -->
+                                                Записей: {{ posts_number }}
+                                            </div>
+                                    </li>
+                            </ul>
+                    </div>
+            </div>
+
+            <div class="col-md-9">                
+                <!-- Отображение поста. -->
+                {% include "post_item.html" with post=post %}
+                <!-- Отображение комментариев. -->
+                {% for item in comments %}
+                <div class="media card mb-4">
+                        <div class="media-body card-body">
+                                <h5 class="mt-0">
+                                        <a href="{% url 'profile' item.author.username %}"
+                                        name="comment_{{ item.id }}">
+                                                {{ item.author.username }}
+                                        </a>
+                                </h5>
+                                <p>{{ item.text | linebreaksbr }}</p>
+                        </div>
+                </div>
+                {% endfor %}
+     </div>
+    </div>
+</main>
+
+{% endblock %}
