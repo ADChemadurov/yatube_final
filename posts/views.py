@@ -1,24 +1,12 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404, get_list_or_404
+from django.shortcuts import render, get_object_or_404
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.core.cache import cache
 
 from django.core.paginator import Paginator
 
-from .models import Comment, Follow, Post, Group, User
+from .models import Follow, Post, Group, User
 from .forms import PostForm, CommentForm
-
-
-@login_required
-def follow_index(request):
-    """ Отображение всех постов авторов на которых подписан пользователь. """
-    posts = Post.objects.filter(author__following__user=request.user)
-    paginator = Paginator(posts, 10)
-    page_number = request.GET.get("page")
-    page = paginator.get_page(page_number)
-    context = {"page": page, "paginator": paginator}
-    return render(request, "posts/follow.html", context)
 
 
 def index(request):
@@ -58,6 +46,17 @@ def new_post(request):
         form.save()
         return redirect("index")
     return render(request, "posts/new_post.html", context)
+
+
+@login_required
+def follow_index(request):
+    """ Отображение всех постов авторов на которых подписан пользователь. """
+    posts = Post.objects.filter(author__following__user=request.user)
+    paginator = Paginator(posts, 10)
+    page_number = request.GET.get("page")
+    page = paginator.get_page(page_number)
+    context = {"page": page, "paginator": paginator}
+    return render(request, "posts/follow.html", context)
 
 
 def profile(request, username):
@@ -100,14 +99,14 @@ def profile_follow(request, username):
     # Проверка, на наличие уже ранее созданной записи подписки.
     if Follow.objects.filter(
         user=follower, author=followed_author
-        ).exists() == True:
+    ).exists() is True:
         return redirect(
             reverse("profile", kwargs={"username": followed_author})
         )
     # Если проверки пройдены, создаем новую запись.
     Follow.objects.create(
-        user = follower,
-        author = followed_author,
+        user=follower,
+        author=followed_author,
     )
     return redirect(
         reverse("profile", kwargs={"username": followed_author})
@@ -123,10 +122,10 @@ def profile_unfollow(request, username):
         user=follower, author=followed_author
     )
     # Проверка, что запись еще/уже не существует.
-    if follow.exists() == False:
-            return redirect(
-                reverse("profile", kwargs={"username": followed_author})
-            )
+    if follow.exists() is False:
+        return redirect(
+            reverse("profile", kwargs={"username": followed_author})
+        )
     # Если проверка пройдена, удаляем запись.
     follow.delete()
     return redirect(
@@ -192,6 +191,7 @@ def post_edit(request, username, post_id):
     }
     return render(request, "posts/new_post.html", context)
 
+
 @login_required
 def add_comment(request, username, post_id):
     """ Отображение страницы страницы создания комментария к посту. """
@@ -202,7 +202,7 @@ def add_comment(request, username, post_id):
     posts_number = Post.objects.filter(author=author).count()
     comments = post.comments.all()
     form = CommentForm(request.POST or None)
-    if form.is_valid():
+    if form.is_valid() and request.user.is_authenticated:
         comment = form.save(commit=False)
         comment.post = Post.objects.get(id=post_id)
         comment.author = request.user

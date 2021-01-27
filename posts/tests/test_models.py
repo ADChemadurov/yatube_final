@@ -1,6 +1,6 @@
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 
-from posts.models import Post, Group, User
+from posts.models import Comment, Follow, Post, Group, User
 
 
 class PostModelTest(TestCase):
@@ -90,3 +90,72 @@ class GroupModelTest(TestCase):
         group = GroupModelTest.group
         expected_object_title = group.title
         self.assertEqual(expected_object_title, str(group))
+
+
+class CommentModelTest(TransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.post = Post.objects.create(
+            id=1,
+            author=User.objects.create_user("test-author"),
+            text="Это тестовый текст."*10,
+        )
+
+        cls.comment = Comment.objects.create(
+            id=1,
+            post=Post.objects.get(id=cls.post.id),
+            text="Тест тестового коммента.",
+            author=User.objects.create_user("test-commenter"),
+        )
+
+    def test_verbose_names(self):
+        comment = CommentModelTest.comment
+        field_verboses = {
+            "text": "Текст комментария.",
+            "created": "Дата публикации комментария.",
+            "author": "Автор комментария.",
+            "post": "Пост к комментарию.",
+        }
+        for value, expected in field_verboses.items():
+            with self.subTest(value=value):
+                self.assertEqual(
+                    comment._meta.get_field(value).verbose_name, expected)
+
+    def test_help_text(self):
+        comment = CommentModelTest.comment
+        field_help_text = {
+            "text": "Поведайте, что вы думаете по поводу этого поста.",
+        }
+        for value, expected in field_help_text.items():
+            with self.subTest(value=value):
+                self.assertEqual(
+                    comment._meta.get_field(value).help_text, expected)
+
+    def test_object_value_is_text_field(self):
+        comment = CommentModelTest.comment
+        expected_object_value = "Тест тестового коммента."[:15]
+        self.assertEqual(expected_object_value, str(comment))
+
+
+class FollowModelTest(TransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.follower = User.objects.create(username="test-follower")
+        cls.followed = User.objects.create(username="test-followed")
+        cls.follow = Follow.objects.create(
+            user=FollowModelTest.follower,
+            author=FollowModelTest.followed,
+        )
+
+    def test_verbose_names(self):
+        follow = FollowModelTest.follow
+        field_verboses = {
+            "user": "Подписчик",
+            "author": "Автор",
+        }
+        for value, expected in field_verboses.items():
+            with self.subTest(value=value):
+                self.assertEqual(
+                    follow._meta.get_field(value).verbose_name, expected)

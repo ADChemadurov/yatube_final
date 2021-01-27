@@ -5,10 +5,9 @@ from django.conf import settings
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.conf import settings
 
 from posts.forms import PostForm
-from posts.models import Post, Group, User
+from posts.models import Comment, Post, Group, User
 
 
 class NewPostFormTests(TestCase):
@@ -133,7 +132,6 @@ class NewPostFormTests(TestCase):
         # Проверка на то, что текст поста изменился.
         self.assertEqual(Post.objects.get(id=1).text, "Измененый текст поста")
 
-    # Не изменяется группа, выдает ошибку.
     def test_post_edit_changes_post_group(self):
         """Проверяет, что группа поста была изменена и сохранена в базе."""
         Group.objects.create(
@@ -163,3 +161,50 @@ class NewPostFormTests(TestCase):
             Post.objects.get(id=1).group,
             Group.objects.get(id=2)
             )
+
+    def test_auth_user_can_add_comment(self):
+        """
+        Проверяет, что авторизованный пользователь может создать
+        комментарий к посту.
+        """
+        comments_count = Comment.objects.count()
+        form_data = {
+            "text": "Комментарий к тестовому посту.",
+        }
+        response = self.authorized_client.post(
+            reverse(
+                "add_comment",
+                kwargs={"username": "test-author", "post_id": "1"}
+            ),
+            data=form_data,
+            follow=True
+        )
+        self.assertRedirects(response, reverse(
+            "post", kwargs={"username": "test-author", "post_id": "1"}
+        ))
+        self.assertEqual(Comment.objects.count(), comments_count+1)
+        self.assertTrue(Comment.objects.filter(id=1).exists())
+
+    def test_unauth_user_cannot_add_comment(self):
+        """
+        Проверяет, что неавторизованный пользователь не может создать
+        комментарий.
+        """
+        comments_count = Comment.objects.count()
+        form_data = {
+            "text": "Комментарий к тестовому посту.",
+        }
+        response = self.guest_client.post(
+            reverse(
+                "add_comment",
+                kwargs={"username": "test-author", "post_id": "1"}
+            ),
+            data=form_data,
+            follow=True
+        )
+        self.assertRedirects(
+            response,
+            "/auth/login/?next=/test-author/1/comment"
+        )
+        self.assertEqual(Comment.objects.count(), comments_count)
+        self.assertFalse(Comment.objects.filter(id=1).exists())

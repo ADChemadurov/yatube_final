@@ -3,14 +3,13 @@ import tempfile
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, Client
-from django.core.cache import cache
 from django.conf import settings
 from django.urls import reverse
 from django import forms
 
 import datetime as dt
 
-from posts.models import Post, Group, User
+from posts.models import Post, Group, User, Follow
 
 
 class PostPagesTests(TestCase):
@@ -62,8 +61,6 @@ class PostPagesTests(TestCase):
         shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
 
     def setUp(self):
-        # Чистим кэш перед каждым тестом, т.к. главная страница кэшируется.
-        cache.clear()
         # Неавторизованный клиент.
         self.guest_client = Client()
         # Авторизованный клиент.
@@ -83,6 +80,10 @@ class PostPagesTests(TestCase):
                 "post", kwargs={"username": "test-author", "post_id": "15"}
                 ): "posts/post.html",
             reverse("new_post"): "posts/new_post.html",
+            reverse(
+                "add_comment",
+                kwargs={"username": "test-author", "post_id": 15}
+            ): "posts/post.html",
         }
         for reverse_name, template in templates_names.items():
             with self.subTest(template=template):
@@ -92,7 +93,8 @@ class PostPagesTests(TestCase):
     def test_post_edit_uses_correct_template(self):
         """
         Тест на использование правильного шаблона
-        на странице редактирования поста.
+        на странице редактирования поста. Тест вынесене отдельно, т.к.
+        требуется войти под учетной записью автора.
         """
         self.authorized_client.force_login(PostPagesTests.user)
         response = self.authorized_client.get(reverse(
@@ -206,6 +208,10 @@ class PostPagesTests(TestCase):
         text_in_form = str(response.context.get("form").instance)
         text_expected = "Это тестовый текст поста 15."[:15]
         self.assertEqual(text_expected, text_in_form)
+
+    # Новая запись пользователя появляется в ленте тех,
+    # кто на него подписан и не появляется в ленте тех,
+    # кто не подписан на него.
 
     # Тесты проверки контекста.
     def test_homepage_gets_correct_context(self):
@@ -338,7 +344,7 @@ class PostPagesTests(TestCase):
         self.assertEqual(response.context.get("username"), "test-author")
         self.assertEqual(response.context.get("post_id"), 15)
 
-    # Тесты паджинатора.
+        # Тесты паджинатора.
     def test_1st_homepage_has_10_records(self):
         """На 1-ой странице главной страницы находится 10 постов."""
         response = self.client.get(reverse("index"))
@@ -362,3 +368,131 @@ class PostPagesTests(TestCase):
             reverse("group_url", kwargs={"slug": "test-slug"}) + "?page=2"
         )
         self.assertEqual(len(response.context.get("page").object_list), 5)
+
+
+class FollowPagesTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Создание тестового пользователя-автора.
+        cls.author = User.objects.create_user(
+            username="test-author",
+            first_name="Test",
+            last_name="Author",
+        )
+        # Создание 15 тестовых постов автора test-author.
+        post_list = []
+        for post_id in range(1, 16):
+            Post.objects.create(
+                id=post_id,
+                author=User.objects.get(username="test-author"),
+                text=f"Это тестовый текст поста {post_id}."*10,
+            )
+        Post.objects.bulk_create(post_list)
+        # Создание нового автора на которого будет подписка.
+        cls.author_fllwd = User.objects.create(username="test-followed")
+        # Создание поста нового автора.
+        cls.post = Post.objects.create(
+            id=101,
+            author=FollowPagesTests.author_fllwd,
+            text="Текст поста автора на которого оформлена подписка."
+        )
+
+    def setUp(self):
+        # Неавторизованный клиент.
+        self.guest_client = Client()
+        # Авторизованный клиент.
+        self.user = User.objects.create_user(username="test-reader")
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
+        self.follow = Follow.objects.create(
+            user=self.user,
+            author=FollowPagesTests.author_fllwd,
+        )
+
+    def test_correct_templates_used(self):
+        """Тест на правильный шаблон."""
+        response = self.authorized_client.get(reverse("follow_index"))
+        self.assertTemplateUsed(response, "posts/follow.html")
+
+    def test_follows_page_gets_correct_context(self):
+        """ Проверяет контекст передаваемый на страницу подписок. """
+        response = self.authorized_client.get(reverse("follow_index"))
+        post_fllwd_text = response.context.get("page")[0].text
+        post_fllwd_author = response.context.get("page")[0].author
+        post_pub_date = response.context.get("page")[0].pub_date
+        text_expctd = FollowPagesTests.post.text
+        author_expctd = User.objects.get(username="test-followed")
+        pub_date_expctd = dt.date.today().strftime("%d/%m/%Y")
+        self.assertEqual(post_fllwd_text, text_expctd)
+        self.assertEqual(post_fllwd_author, author_expctd)
+        self.assertEqual(
+            post_pub_date.strftime("%d/%m/%Y"), pub_date_expctd)
+
+    def test_followed_author_posts_does_not_appear_at_diff_user_follows(self):
+        """
+        Проверяет, что посты автора, на которого подписан пользователь 1,
+        не появляются в подписках пользователя 2
+        """
+        user_2 = User.objects.create(username="test-user-1")
+        self.authorized_client.force_login(user_2)
+        response = self.authorized_client.get(reverse("follow_index"))
+        posts_in_response = response.context.get("page").object_list
+        post_not_expected = FollowPagesTests.post.text
+        self.assertNotIn(post_not_expected, posts_in_response)
+
+    def test_auth_user_follows_author(self):
+        """
+        Проверяет возможность подписки на автора.
+        Так же тестирует, что нельзя подписаться дважды.
+        """
+        follows_count = Follow.objects.count()
+        self.authorized_client.get(reverse(
+            "profile_follow", kwargs={"username": "test-author"}
+        ))
+        self.assertEqual(Follow.objects.count(), follows_count+1)
+        # Проверяем, что создалась именно 1 нужная нам запись.
+        self.assertEqual(
+            Follow.objects.filter(
+                user=self.user, author=FollowPagesTests.author
+            ).count(), 1
+        )
+        # Проверяем, что нельзя подписаться дважды.
+        self.authorized_client.get(reverse(
+            "profile_follow", kwargs={"username": "test-followed"}
+        ))
+        # Количество записей не должно было увеличиться.
+        self.assertEqual(Follow.objects.count(), follows_count+1)
+
+    def test_unauth_cannot_follow(self):
+        """
+        Проверка на то, что неавторизованный пользователь
+        не может создать запись подписки в базе.
+        """
+        follows_count = Follow.objects.count()
+        self.guest_client.get(reverse(
+            "profile_follow", kwargs={"username": "test-author"}
+        ))
+        self.assertEqual(Follow.objects.count(), follows_count)
+
+    def test_auth_user_unfollows(self):
+        """ Тест на отписку от автора. """
+        follows_count = Follow.objects.count()
+        self.authorized_client.get(reverse(
+            "profile_unfollow", kwargs={"username": "test-followed"}
+        ))
+        # Количество записей должно было уменьшиться на 1.
+        self.assertEqual(Follow.objects.count(), follows_count-1)
+
+    def test_unauth_user_unfollows_does_not_delete_follow(self):
+        """
+        Тест на то, что отписка неавторизованным пользователем не приводит
+        к изменению в базе отписок.
+        """
+        follows_count = Follow.objects.count()
+        # Попытка отписки.
+        self.guest_client.get(reverse(
+            "profile_unfollow", kwargs={"username": "test-followed"}
+        ))
+        # Количество записей не должно было измениться.
+        self.assertEqual(Follow.objects.count(), follows_count)

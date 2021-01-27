@@ -1,4 +1,4 @@
-from django.forms import ModelForm, widgets
+from django.forms import ModelForm
 from django.utils.translation import gettext_lazy as _
 
 from .models import Comment, Post
@@ -20,6 +20,7 @@ class PostForm(ModelForm):
             ),
             "text": _("Поделитесь своими мыслями, новостями или событиями.")
         }
+
 
 class CommentForm(ModelForm):
     class Meta:

@@ -89,6 +89,9 @@ class Comment(models.Model):
     class Meta():
         ordering = ("-created",)
 
+    def __str__(self):
+        return self.text[:15]
+
 
 class Follow(models.Model):
     user = models.ForeignKey(
