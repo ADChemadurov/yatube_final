@@ -204,7 +204,7 @@ class NewPostFormTests(TestCase):
         )
         self.assertRedirects(
             response,
-            "/auth/login/?next=/test-author/1/comment"
+            "/auth/login/?next=/test-author/1/comment/"
         )
         self.assertEqual(Comment.objects.count(), comments_count)
         self.assertFalse(Comment.objects.filter(id=1).exists())
