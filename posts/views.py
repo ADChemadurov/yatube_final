@@ -51,7 +51,6 @@ def new_post(request):
 @login_required
 def follow_index(request):
     """ Отображение всех постов авторов на которых подписан пользователь. """
-    # posts = Post.objects.filter(author__following__user=request.user)
     posts = Post.objects.select_related(
         "author"
         ).filter(author__following__user=request.user)
