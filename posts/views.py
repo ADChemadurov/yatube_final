@@ -27,7 +27,7 @@ def group_posts(request, slug):
     Отображение страницы группы. Принцип отображения как у главной страницы.
     """
     group = get_object_or_404(Group, slug=slug)
-    posts = group.posts.order_by("-pub_date")
+    posts = group.posts.all()
     paginator = Paginator(posts, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
@@ -51,7 +51,10 @@ def new_post(request):
 @login_required
 def follow_index(request):
     """ Отображение всех постов авторов на которых подписан пользователь. """
-    posts = Post.objects.filter(author__following__user=request.user)
+    # posts = Post.objects.filter(author__following__user=request.user)
+    posts = Post.objects.select_related(
+        "author"
+        ).filter(author__following__user=request.user)
     paginator = Paginator(posts, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
@@ -62,7 +65,7 @@ def follow_index(request):
 def profile(request, username):
     """ Страница отображения профиля автора. Показывает все посты автора. """
     author = get_object_or_404(User, username=username)
-    post_list = Post.objects.filter(author=author).order_by("-pub_date")
+    post_list = author.posts.all()
     followers_qty = author.following.count()
     followed_qty = author.follower.count()
     following = False
@@ -70,7 +73,7 @@ def profile(request, username):
         following = Follow.objects.filter(
             user=request.user, author=author
             ).exists()
-    posts_number = post_list.count()
+    posts_number = len(post_list)
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
@@ -91,26 +94,18 @@ def profile_follow(request, username):
     """ Подписывает на автора. """
     follower = get_object_or_404(User, username=request.user)
     followed_author = get_object_or_404(User, username=username)
+    followed_author_profile_url = reverse(
+        "profile", kwargs={"username": followed_author}
+    )
     # Проверка, что не пользователь не пытается сам на себя подписаться.
     if follower == followed_author:
-        return redirect(
-            reverse("profile", kwargs={"username": followed_author})
-        )
-    # Проверка, на наличие уже ранее созданной записи подписки.
-    if Follow.objects.filter(
-        user=follower, author=followed_author
-    ).exists() is True:
-        return redirect(
-            reverse("profile", kwargs={"username": followed_author})
-        )
+        return redirect(followed_author_profile_url)
     # Если проверки пройдены, создаем новую запись.
-    Follow.objects.create(
+    Follow.objects.get_or_create(
         user=follower,
         author=followed_author,
     )
-    return redirect(
-        reverse("profile", kwargs={"username": followed_author})
-    )
+    return redirect(followed_author_profile_url)
 
 
 @login_required
@@ -118,16 +113,7 @@ def profile_unfollow(request, username):
     """ Отписывает от автора. """
     follower = get_object_or_404(User, username=request.user)
     followed_author = get_object_or_404(User, username=username)
-    follow = Follow.objects.filter(
-        user=follower, author=followed_author
-    )
-    # Проверка, что запись еще/уже не существует.
-    if follow.exists() is False:
-        return redirect(
-            reverse("profile", kwargs={"username": followed_author})
-        )
-    # Если проверка пройдена, удаляем запись.
-    follow.delete()
+    Follow.objects.filter(user=follower, author=followed_author).delete()
     return redirect(
         reverse("profile", kwargs={"username": followed_author})
     )
@@ -142,10 +128,10 @@ def post_view(request, username, post_id):
     post = get_object_or_404(Post, id=post_id)
     followers_qty = author.following.count()
     followed_qty = author.follower.count()
-    posts_number = Post.objects.filter(author=author).count()
+    posts_number = author.posts.count()
     comments = post.comments.all()
     form = CommentForm(request.POST or None)
-    if form.is_valid():
+    if form.is_valid() and request.user.is_authenticated:
         comment = form.save(commit=False)
         comment.post = Post.objects.get(id=post_id)
         comment.author = request.user
@@ -199,12 +185,12 @@ def add_comment(request, username, post_id):
     post = get_object_or_404(Post, id=post_id)
     followers_qty = author.following.count()
     followed_qty = author.follower.count()
-    posts_number = Post.objects.filter(author=author).count()
+    posts_number = author.posts.count()
     comments = post.comments.all()
     form = CommentForm(request.POST or None)
     if form.is_valid() and request.user.is_authenticated:
         comment = form.save(commit=False)
-        comment.post = Post.objects.get(id=post_id)
+        comment.post = post
         comment.author = request.user
         form.save()
         return redirect(
