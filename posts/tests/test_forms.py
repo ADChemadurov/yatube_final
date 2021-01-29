@@ -73,6 +73,7 @@ class NewPostFormTests(TestCase):
         form_labels = {
             "group": "Сообщество:",
             "text": "Текст поста:",
+            "image": "Изображение:",
         }
         for value, expected in form_labels.items():
             with self.subTest(value=value):
@@ -86,6 +87,7 @@ class NewPostFormTests(TestCase):
                      "в котором будет опубликован Ваш пост. "
                      "Необязательно к заполненинию.",
             "text": "Поделитесь своими мыслями, новостями или событиями.",
+            "image": "Выберите изображение для своего поста.",
         }
         for value, expected in form_help_texts.items():
             with self.subTest(value=value):

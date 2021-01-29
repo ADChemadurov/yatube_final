@@ -55,7 +55,12 @@ class Post(models.Model):
         help_text="Выберите сообщество для публикации поста. "
                   "А если хотите, то не выбирайте. Это необязательно.",
     )
-    image = models.ImageField(upload_to='posts/', blank=True, null=True)
+    image = models.ImageField(
+        upload_to='posts/',
+        blank=True,
+        null=True,
+        verbose_name="Изображение:",
+        help_text="Выберите изображение для своего поста.")
 
     class Meta():
         ordering = ("-pub_date",)
