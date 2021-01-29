@@ -55,8 +55,7 @@ class PostsURLTests(TestCase):
             "/follow/": 302,
             "/test-author/follow/": 302,
             "/test-author/unfollow/": 302,
-            # add_comment, возвращает 404, а не 302!
-            # "/test-author/1/comment/": 302,
+            "/test-author/1/comment/": 302,
         }
         for url, response_code in requests.items():
             with self.subTest(response_code=response_code):
@@ -197,7 +196,7 @@ class PostsURLTests(TestCase):
             "add_comment", kwargs={"username": "test-author", "post_id": "1"}
         ))
         self.assertRedirects(
-            response, "/auth/login/?next=/test-author/1/comment"
+            response, "/auth/login/?next=/test-author/1/comment/"
         )
 
     def test_correct_templates_used(self):
