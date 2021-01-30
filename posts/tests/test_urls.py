@@ -78,8 +78,7 @@ class PostsURLTests(TestCase):
             "/test-author/follow/": 302,
             "/follow/": 200,
             "/test-author/unfollow/": 302,
-            # add_comment, возвращает 404, а не 200!
-            # "/test-author/1/comment/": 200,
+            "/test-author/1/comment/": 200,
         }
         for url, response_code in requests.items():
             with self.subTest(response_code=response_code):
